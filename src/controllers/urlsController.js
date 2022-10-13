@@ -44,4 +44,23 @@ const shortenUrl = async (req, res) => {
   }
 };
 
-export { shortenUrl };
+const urlById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const url = await connection.query(`SELECT * FROM urls WHERE id = $1;`, [
+      id,
+    ]);
+    if (url.rowCount === 0) {
+      return res.sendStatus(404);
+    }
+    const response = {
+      id: url.rows[0].id,
+      shortUrl: url.rows[0].shortUrl,
+      url: url.rows[0].url,
+    };
+    res.status(200).send(response);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+export { shortenUrl, urlById };
