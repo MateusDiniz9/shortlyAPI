@@ -1,0 +1,31 @@
+CREATE DATABASE shortly;
+
+CREATE TABLE users(
+	id SERIAL PRIMARY KEY,
+	name VARCHAR(200) NOT NULL,
+	email VARCHAR(200) NOT NULL,
+	"encryptedPassword" TEXT NOT NULL,
+	"createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE urls(
+	id SERIAL PRIMARY KEY,
+	url TEXT NOT NULL,
+	"shortUrl" VARCHAR(100) NOT NULL,
+	"userId" INTEGER REFERENCES "users"("id"),
+	"createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE visits(
+	id SERIAL PRIMARY KEY,
+	"urlId" INTEGER REFERENCES "urls"("id"),
+	"userId" INTEGER REFERENCES "users"("id"),
+	"createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE sessions(
+	id SERIAL PRIMARY KEY,
+	"userId" INTEGER REFERENCES "users"("id"),
+	token TEXT NOT NULL,
+	"createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
