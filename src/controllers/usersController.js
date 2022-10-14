@@ -83,4 +83,61 @@ const signIn = async (req, res) => {
   }
 };
 
-export { signUp, signIn };
+const usersInfos = async (req, res) => {
+  const { authorization } = req.headers;
+  const token = authorization?.replace("Bearer ", "");
+  if (!token) {
+    return res.sendStatus(401);
+  }
+  try {
+    const user = await connection.query(
+      `SELECT * FROM sessions WHERE token = $1;`,
+      [token]
+    );
+    if (user.rowCount === 0) {
+      return res.sendStatus(404);
+    }
+    const userId = user.rows[0].userId;
+
+    const hasUrls = await connection.query(
+      `SELECT * FROM urls WHERE "userId" = $1;`,
+      [userId]
+    );
+    if (hasUrls.rowCount === 0) {
+      const zeroUser = await connection.query(
+        `SELECT * FROM users WHERE users.id = $1`,
+        [userId]
+      );
+
+      const response = {
+        id: userId,
+        name: zeroUser.rows[0].name,
+        visitCount: 0,
+        shortenedUrls: {},
+      };
+      return res.status(200).send(response);
+    }
+
+    const userData = await connection.query(
+      `SELECT name, COUNT("userId") AS "visitCount" FROM users 
+      JOIN visits ON visits."userId" = users.id WHERE users.id = $1 GROUP BY users.id;`,
+      [userId]
+    );
+    const urlsData = await connection.query(
+      `SELECT urls.id, urls.url, urls."shortUrl", COUNT(*) AS "visitCount" FROM urls
+    JOIN visits ON visits."urlId" = urls.id WHERE urls."userId" = $1 GROUP BY urls.id;`,
+      [userId]
+    );
+    urlsData.rows.map((url) => url.visitCount--);
+    const response = {
+      id: userId,
+      name: userData.rows[0].name,
+      visitCount: userData.rows[0].visitCount - urlsData.rows.length,
+      shortenedUrls: urlsData.rows,
+    };
+    res.status(200).send(response);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+export { signUp, signIn, usersInfos };

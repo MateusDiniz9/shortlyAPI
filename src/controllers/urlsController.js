@@ -29,6 +29,9 @@ const shortenUrl = async (req, res) => {
       `SELECT "userId" FROM sessions WHERE token = $1;`,
       [token]
     );
+    if (userId.rowCount === 0) {
+      return res.sendStatus(401);
+    }
     let shorten = url;
     shorten = nanoid();
     const response = { shortUrl: shorten };
@@ -36,6 +39,16 @@ const shortenUrl = async (req, res) => {
     await connection.query(
       `INSERT INTO urls (url, "shortUrl", "userId") VALUES ($1,$2,$3);`,
       [url, shorten, userId.rows[0].userId]
+    );
+
+    const selfUrl = await connection.query(
+      `SELECT * FROM urls WHERE "shortUrl" = $1;`,
+      [shorten]
+    );
+
+    await connection.query(
+      `INSERT INTO visits ("urlId", "userId") VALUES ($1,$2);`,
+      [selfUrl.rows[0].id, selfUrl.rows[0].userId]
     );
 
     res.status(201).send(response);
@@ -63,4 +76,65 @@ const urlById = async (req, res) => {
     res.status(500).send(error.message);
   }
 };
-export { shortenUrl, urlById };
+
+const openShortUrl = async (req, res) => {
+  const { shortUrl } = req.params;
+  const short = shortUrl?.replace(":", "");
+  try {
+    const shortUrlExist = await connection.query(
+      `SELECT * FROM urls Where "shortUrl" = $1;`,
+      [short]
+    );
+
+    if (shortUrlExist.rowCount === 0) {
+      return res.sendStatus(404);
+    }
+
+    await connection.query(
+      `INSERT INTO visits ("urlId", "userId") VALUES ($1,$2);`,
+      [shortUrlExist.rows[0].id, shortUrlExist.rows[0].userId]
+    );
+
+    return res.redirect(`${shortUrlExist.rows[0].url}`);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+
+const deleteUrlById = async (req, res) => {
+  const { authorization } = req.headers;
+  const token = authorization?.replace("Bearer ", "");
+  if (!token) {
+    return res.sendStatus(401);
+  }
+  const { id } = req.params;
+
+  try {
+    const user = await connection.query(
+      `SELECT * FROM sessions WHERE token = $1;`,
+      [token]
+    );
+    if (user.rowCount === 0) {
+      return res.sendStatus(401);
+    }
+    const url = await connection.query(`SELECT * FROM urls WHERE id = $1;`, [
+      id,
+    ]);
+    if (url.rowCount === 0) {
+      return res.sendStatus(404);
+    }
+    if (user.rows[0].userId !== url.rows[0].userId) {
+      return res.sendStatus(401);
+    }
+    await connection.query(`DELETE FROM visits WHERE "urlId" = $1;`, [
+      url.rows[0].id,
+    ]);
+    await connection.query(`DELETE FROM urls WHERE url = $1;`, [
+      url.rows[0].url,
+    ]);
+    res.sendStatus(204);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+export { shortenUrl, urlById, openShortUrl, deleteUrlById };
