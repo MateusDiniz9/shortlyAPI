@@ -84,19 +84,8 @@ const signIn = async (req, res) => {
 };
 
 const usersInfos = async (req, res) => {
-  const { authorization } = req.headers;
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) {
-    return res.sendStatus(401);
-  }
+  const { user } = res.locals;
   try {
-    const user = await connection.query(
-      `SELECT * FROM sessions WHERE token = $1;`,
-      [token]
-    );
-    if (user.rowCount === 0) {
-      return res.sendStatus(404);
-    }
     const userId = user.rows[0].userId;
 
     const hasUrls = await connection.query(

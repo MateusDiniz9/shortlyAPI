@@ -3,13 +3,8 @@ import { urlsSchema } from "../schemas/urlsSchema.js";
 import { nanoid } from "nanoid";
 
 const shortenUrl = async (req, res) => {
-  const { authorization } = req.headers;
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) {
-    return res.sendStatus(401);
-  }
-
   const { url } = req.body;
+  const { user } = res.locals;
 
   const validation = urlsSchema.validate({ url }, { abortEarly: false });
   if (validation.error) {
@@ -25,20 +20,13 @@ const shortenUrl = async (req, res) => {
   }
 
   try {
-    const userId = await connection.query(
-      `SELECT "userId" FROM sessions WHERE token = $1;`,
-      [token]
-    );
-    if (userId.rowCount === 0) {
-      return res.sendStatus(401);
-    }
     let shorten = url;
     shorten = nanoid();
     const response = { shortUrl: shorten };
 
     await connection.query(
       `INSERT INTO urls (url, "shortUrl", "userId") VALUES ($1,$2,$3);`,
-      [url, shorten, userId.rows[0].userId]
+      [url, shorten, user.rows[0].userId]
     );
 
     const selfUrl = await connection.query(
@@ -102,21 +90,9 @@ const openShortUrl = async (req, res) => {
 };
 
 const deleteUrlById = async (req, res) => {
-  const { authorization } = req.headers;
-  const token = authorization?.replace("Bearer ", "");
-  if (!token) {
-    return res.sendStatus(401);
-  }
   const { id } = req.params;
-
+  const { user } = res.locals;
   try {
-    const user = await connection.query(
-      `SELECT * FROM sessions WHERE token = $1;`,
-      [token]
-    );
-    if (user.rowCount === 0) {
-      return res.sendStatus(401);
-    }
     const url = await connection.query(`SELECT * FROM urls WHERE id = $1;`, [
       id,
     ]);
